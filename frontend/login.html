@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/" style="text-decoration:none;">
+    <div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div>
+  </a>
+  <nav><a href="/register.html">Register</a></nav>
+</header>
+<main class="page narrow">
+  <div class="hero" style="padding-top:1.5rem;">
+    <div class="eyebrow">Private note vault</div>
+    <h1 style="font-size:2rem;">Welcome back</h1>
+    <p>Sign in to access your personal notes.</p>
+  </div>
+  <section class="card">
+    <div id="message" class="alert" hidden></div>
+    <form id="login-form">
+      <div class="field"><label for="identifier">Email </label><input id="identifier" name="identifier" required autocomplete="username"></div>
+      <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+      <button class="btn btn-primary btn-block" type="submit">Login</button>
+    </form>
+    <p class="footer-note"><button class="btn-link-sm" id="show-forgot" type="button">Forgot password?</button> New here? <a href="/register.html">Create an account</a></p>
+    <div id="forgot-panel" hidden>
+      <hr class="divider">
+      <p class="subtitle">Send a password reset link to your registered email address.</p>
+      <form id="forgot-form">
+        <div class="field"><label for="forgot-email">Email address</label><input id="forgot-email" type="email" required autocomplete="email"></div>
+        <button class="btn btn-outline btn-block" id="send-forgot-otp" type="submit">Send reset link</button>
+      </form>
+    </div>
+  </section>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/auth.js"></script>
+<script>document.getElementById('show-forgot').addEventListener('click', function () { document.getElementById('forgot-panel').hidden = false; this.hidden = true; });</script>
+</body>
+</html>

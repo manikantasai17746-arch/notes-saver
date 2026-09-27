@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Note - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .note-reader {
+    height: calc(100vh - 270px);
+    min-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: #F8FAFC;
+    color: var(--ink);
+    line-height: 1.7;
+    font-size: 1rem;
+  }
+  .note-reader::-webkit-scrollbar { width: 10px; }
+  .note-reader::-webkit-scrollbar-thumb { background: var(--au-blue); border-radius: 8px; }
+  .note-reader::-webkit-scrollbar-track { background: #EAF0F8; }
+  .note-meta { color: var(--mute); font-size: 0.84rem; margin-bottom: 1.2rem; }
+  .note-view-page { max-width: 1200px; }
+  .note-view-page .card { width: 100%; }
+  @media (max-width: 640px) {
+    .note-reader { height: calc(100vh - 300px); min-height: 280px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a href="/notes.html" style="text-decoration:none;"><div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div></a>
+  <nav><a href="/notes.html">Back to notes</a></nav>
+</header>
+<main class="page note-view-page">
+  <div class="hero" style="padding-top:1.5rem;"><div class="eyebrow">Note viewer</div><h1 id="note-title" style="font-size:2rem;">Loading note...</h1></div>
+  <section class="card">
+    <div id="message" class="alert" hidden></div>
+    <div id="note-meta" class="note-meta"></div>
+    <div id="locked-area" hidden></div>
+    <div id="note-reader" class="note-reader" hidden></div>
+  </section>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script>
+(async function () {
+  const supabase = await window.supabaseReady;
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data.session;
+  if (!session) { window.location.href = '/login.html'; return; }
+  const notes = JSON.parse(localStorage.getItem('notes-demo-notes') || '[]');
+  const user = JSON.parse(localStorage.getItem('notes-demo-user') || 'null');
+  const selectedIndex = Number(sessionStorage.getItem('notes-selected-index'));
+  const note = notes[selectedIndex];
+  const title = document.getElementById('note-title');
+  const meta = document.getElementById('note-meta');
+  const reader = document.getElementById('note-reader');
+  const lockedArea = document.getElementById('locked-area');
+  const message = document.getElementById('message');
+
+  function showMessage(text, type) { message.textContent = text; message.className = 'alert alert-' + type; message.hidden = false; }
+  function showNote() { sessionStorage.setItem('notes-unlocked-' + selectedIndex, 'true'); reader.textContent = note.content; reader.hidden = false; lockedArea.hidden = true; showMessage('Note unlocked.', 'success'); }
+
+  if (!note) {
+    title.textContent = 'Note not found'; showMessage('This note is no longer available.', 'error'); return;
+  }
+  title.textContent = note.title;
+  meta.textContent = (note.locked ? 'Locked note' : 'Private note') + (note.createdAt ? ' - ' + note.createdAt : '');
+  if (!note.locked) { showNote(); return; }
+
+  lockedArea.hidden = false;
+  const maskedEmail = user && user.email ? user.email.replace(/^(.{2})[^@]*(@.*)$/, '$1***$2') : 'your registered email';
+  lockedArea.innerHTML = '<p>This note is locked. Enter the password set when it was created.</p><form id="unlock-form"><div class="field"><label for="note-password">Note password</label><input id="note-password" type="password" minlength="4" required autocomplete="off"></div><button class="btn btn-primary btn-block" type="submit">Unlock note</button></form><p style="margin-top:1rem;"><button class="btn-link-sm" id="forgot-note-password" type="button">Forgot note password?</button></p><form id="note-recovery-form" hidden><p class="hint">An OTP will be sent to <strong>' + maskedEmail + '</strong>.</p><button class="btn btn-outline btn-block" id="send-note-otp" type="submit">Send OTP</button></form><form id="note-otp-form" hidden style="margin-top:1rem;"><div class="field"><label for="note-otp">Email OTP</label><input id="note-otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></div><div class="field"><label for="new-note-password">New note password</label><input id="new-note-password" type="password" minlength="4" required></div><button class="btn btn-primary btn-block" type="submit">Verify OTP and unlock</button></form>';
+  document.getElementById('unlock-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (document.getElementById('note-password').value !== note.password) { showMessage('Wrong password. Try the password used when saving this note.', 'error'); return; }
+    showNote();
+  });
+  document.getElementById('forgot-note-password').addEventListener('click', function () {
+    document.getElementById('note-recovery-form').hidden = false;
+    this.hidden = true;
+  });
+  document.getElementById('note-recovery-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const email = user && String(user.email || '').trim().toLowerCase();
+    if (!email) { showMessage('No registered email is available for this account.', 'error'); return; }
+    const button = document.getElementById('send-note-otp'); button.disabled = true;
+    try {
+      const response = await fetch('/api/send-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email: email }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error);
+      document.getElementById('note-otp-form').hidden = false; showMessage('OTP sent to your Gmail. It expires in 10 minutes.', 'success');
+    } catch (error) { showMessage(error.message, 'error'); } finally { button.disabled = false; }
+  });
+  document.getElementById('note-otp-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const email = user && String(user.email || '').trim().toLowerCase();
+    const response = await fetch('/api/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email: email, otp: document.getElementById('note-otp').value }) });
+    const result = await response.json();
+    if (!response.ok) { showMessage(result.error, 'error'); return; }
+    note.password = document.getElementById('new-note-password').value;
+    notes[selectedIndex] = note;
+    const updateResult = await supabase.from('notes').update({ note_password: note.password }).eq('id', note.id).eq('user_id', session.user.id);
+    if (updateResult.error) { showMessage(updateResult.error.message, 'error'); return; }
+    localStorage.setItem('notes-demo-notes', JSON.stringify(notes));
+    showNote();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "notes-cpp-email-recovery",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Notes frontend with Supabase auth and email OTP recovery",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "nodemailer": "^7.0.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

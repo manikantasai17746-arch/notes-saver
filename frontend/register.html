@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/" style="text-decoration:none;">
+    <div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div>
+  </a>
+  <nav><a href="/login.html">Login</a></nav>
+</header>
+<main class="page narrow">
+  <div class="hero" style="padding-top:1.5rem;">
+    <div class="eyebrow">Start writing privately</div>
+    <h1 style="font-size:2rem;">Create your account</h1>
+    <p>Set up your personal note vault in a few seconds.</p>
+  </div>
+  <section class="card">
+    <div id="message" class="alert" hidden></div>
+    <form id="register-form">
+      <div class="field"><label for="username">Username</label><input id="username" name="username" required autocomplete="username"></div>
+      <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" minlength="4" required autocomplete="new-password"></div>
+      <div class="field"><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" minlength="4" required autocomplete="new-password"></div>
+      <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" required autocomplete="email"><div class="hint">We will use this email for password recovery.</div></div>
+      <button class="btn btn-primary btn-block" type="submit">Create account</button>
+    </form>
+    <p class="footer-note">Already registered? <a href="/login.html">Login</a></p>
+  </section>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/auth.js"></script>
+</body>
+</html>

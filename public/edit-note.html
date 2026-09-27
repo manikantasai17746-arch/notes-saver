@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modify Note - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/notes.html" style="text-decoration:none;"><div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div></a>
+  <nav><a href="/notes.html">Back to notes</a></nav>
+</header>
+<main class="page narrow">
+  <div class="hero" style="padding-top:1.5rem;"><div class="eyebrow">Edit your note</div><h1 style="font-size:2rem;">Modify note</h1><p>Update the title or content, then save your changes.</p></div>
+  <section class="card">
+    <div id="message" class="alert" hidden></div>
+    <div id="unlock-area" hidden></div>
+    <form id="edit-form" hidden>
+      <div class="field"><label for="title">Title</label><input id="title" maxlength="80" required></div>
+      <div class="field"><label for="content">Content</label><textarea id="content" rows="12" required></textarea></div>
+      <button class="btn btn-primary btn-block" type="submit">Save changes</button>
+    </form>
+  </section>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script>
+(async function () {
+  const supabase = await window.supabaseReady;
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data.session;
+  if (!session) { window.location.href = '/login.html'; return; }
+  const notes = JSON.parse(localStorage.getItem('notes-demo-notes') || '[]');
+  const index = Number(sessionStorage.getItem('notes-selected-index'));
+  const note = notes[index];
+  const message = document.getElementById('message');
+  const unlockArea = document.getElementById('unlock-area');
+  const editForm = document.getElementById('edit-form');
+  if (!note) { showMessage('Note not found.', 'error'); return; }
+
+  function showMessage(text, type) { message.textContent = text; message.className = 'alert alert-' + type; message.hidden = false; }
+  function showEditor() {
+    document.getElementById('title').value = note.title;
+    document.getElementById('content').value = note.content;
+    unlockArea.hidden = true; editForm.hidden = false;
+  }
+  function unlock() {
+    sessionStorage.setItem('notes-unlocked-' + index, 'true');
+    showEditor();
+  }
+
+  if (!note.locked || sessionStorage.getItem('notes-unlocked-' + index) === 'true') {
+    showEditor();
+  } else {
+    unlockArea.hidden = false;
+    unlockArea.innerHTML = '<p>This note is locked. Enter its password before modifying it.</p><form id="unlock-form"><div class="field"><label for="note-password">Note password</label><input id="note-password" type="password" minlength="4" required autocomplete="off"></div><button class="btn btn-primary btn-block" type="submit">Unlock and modify</button></form>';
+    document.getElementById('unlock-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (document.getElementById('note-password').value !== note.password) { showMessage('Wrong note password.', 'error'); return; }
+      unlock();
+    });
+  }
+
+  editForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    note.title = document.getElementById('title').value.trim();
+    note.content = document.getElementById('content').value.trim();
+    notes[index] = note;
+    const result = await supabase.from('notes').update({ title: note.title, content: note.content }).eq('id', note.id).eq('user_id', session.user.id);
+    if (result.error) { showMessage(result.error.message, 'error'); return; }
+    localStorage.setItem('notes-demo-notes', JSON.stringify(notes));
+    showMessage('Note changes saved.', 'success');
+  });
+})();
+</script>
+</body>
+</html>

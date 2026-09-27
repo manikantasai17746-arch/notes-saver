@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recycle Bin - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/notes.html" style="text-decoration:none;"><div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div></a>
+  <nav><a href="/notes.html">Back to notes</a></nav>
+</header>
+<main class="page">
+  <div class="section-title"><div><div class="eyebrow">Recently deleted</div><h1>Recycle Bin</h1></div><span class="pill" id="trash-count">0 notes</span></div>
+  <div id="message" class="alert" hidden></div>
+  <p class="subtitle">Restore deleted notes or permanently remove them.</p>
+  <section id="trash-list"></section>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script>
+(async function () {
+  const supabase = await window.supabaseReady;
+  const sessionResult = await supabase.auth.getSession();
+  const session = sessionResult.data.session;
+  if (!session) { window.location.href = '/login.html'; return; }
+  const list = document.getElementById('trash-list');
+  const count = document.getElementById('trash-count');
+  const message = document.getElementById('message');
+  let trash = [];
+  function showMessage(text, type) { message.textContent = text; message.className = 'alert alert-' + type; message.hidden = false; }
+  function render() {
+    count.textContent = trash.length + (trash.length === 1 ? ' note' : ' notes'); list.innerHTML = '';
+    trash.forEach(function (note, index) {
+      const item = document.createElement('article'); item.className = 'index-card';
+      const badge = document.createElement('div'); badge.className = 'badge'; badge.textContent = note.locked ? 'LOCK' : 'NOTE';
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const title = document.createElement('div'); title.className = 'title'; title.textContent = note.title;
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = 'Deleted ' + (note.deletedAt || 'recently');
+      meta.append(title, sub);
+      const actions = document.createElement('div'); actions.className = 'actions';
+      const restore = document.createElement('button'); restore.className = 'btn btn-outline btn-sm'; restore.textContent = 'Restore';
+      restore.addEventListener('click', async function () {
+        const result = await supabase.from('notes').update({ deleted_at: null }).eq('id', note.id).eq('user_id', session.user.id);
+        if (result.error) { showMessage(result.error.message, 'error'); return; }
+        trash.splice(index, 1); render(); showMessage('Note restored to My Notes.', 'success');
+      });
+      const remove = document.createElement('button'); remove.className = 'btn btn-danger btn-sm'; remove.textContent = 'Delete forever';
+      remove.addEventListener('click', async function () { const result = await supabase.from('notes').delete().eq('id', note.id).eq('user_id', session.user.id); if (result.error) { showMessage(result.error.message, 'error'); return; } trash.splice(index, 1); render(); showMessage('Note permanently deleted.', 'success'); });
+      actions.append(restore, remove); item.append(badge, meta, actions); list.append(item);
+    });
+    if (!trash.length) list.innerHTML = '<div class="empty"><div class="icon">R</div>Recycle Bin is empty.</div>';
+  }
+  const result = await supabase.from('notes').select('*').eq('user_id', session.user.id).not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+  if (result.error) { showMessage(result.error.message, 'error'); return; }
+  trash = result.data.map(function (row) { return { id: row.id, title: row.title, content: row.content, locked: row.is_locked, password: row.note_password, deletedAt: row.deleted_at }; });
+  render();
+})();
+</script>
+</body>
+</html>

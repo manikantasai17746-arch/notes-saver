@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Notes - Notes</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a href="/" style="text-decoration:none;"><div class="brand"><img src="/aditya-logo.png" alt="Logo" class="brand-logo"><div class="brand-text"><span class="app">Notes</span></div></div></a>
+  <nav><span class="who" id="user-label"></span><a class="btn-ghost-topbar" href="/recycle.html">Recycle Bin</a><button class="btn-ghost-topbar" id="logout">Logout</button></nav>
+</header>
+<main class="page">
+  <div class="section-title"><div><div class="eyebrow">Your private vault</div><h1>My Notes</h1></div><span class="pill" id="note-count">0 notes</span></div>
+  <div id="message" class="alert" hidden></div>
+  <div class="grid-2">
+    <section class="card">
+      <h2 class="section-title"><span>Add a note</span></h2>
+      <form id="note-form">
+        <div class="field"><label for="title">Title</label><input id="title" required maxlength="80"></div>
+        <div class="field"><label for="content">Content</label><textarea id="content" rows="7" required></textarea></div>
+        <div class="field"><label><input id="important" type="checkbox"> Mark as important and lock this note</label></div>
+        <div class="field" id="note-password-field" hidden><label for="note-password">Note password</label><input id="note-password" type="password" minlength="4"></div>
+        <button class="btn btn-primary btn-block" type="submit">Save note</button>
+      </form>
+    </section>
+    <section>
+      <div class="section-title"><h2>Saved notes</h2><span class="subtitle" id="note-hint"></span></div>
+      <div id="notes-list"></div>
+    </section>
+  </div>
+</main>
+<script src="/js/supabase-client.js"></script>
+<script>
+(async function () {
+  const userKey = 'notes-demo-user';
+  const notesKey = 'notes-demo-notes';
+  const supabase = await window.supabaseReady;
+  const authResult = await supabase.auth.getSession();
+  const session = authResult.data.session;
+  const user = session && session.user;
+  if (!user) { window.location.href = '/login.html'; return; }
+  const message = document.getElementById('message');
+  const notesList = document.getElementById('notes-list');
+  const noteCount = document.getElementById('note-count');
+  let notes = [];
+  const trashKey = 'notes-demo-trash';
+  document.getElementById('user-label').textContent = user.user_metadata.username || user.email;
+
+  function showMessage(text, type) {
+    message.textContent = text; message.className = 'alert alert-' + type; message.hidden = false;
+  }
+  function saveNotes() { localStorage.setItem(notesKey, JSON.stringify(notes)); }
+  async function loadNotes() {
+    const result = await supabase.from('notes').select('*').eq('user_id', user.id).is('deleted_at', null).order('created_at', { ascending: false });
+    if (result.error) { showMessage(result.error.message, 'error'); return; }
+    notes = result.data.map(function (row) { return { id: row.id, title: row.title, content: row.content, locked: row.is_locked, password: row.note_password, createdAt: row.created_at }; });
+    saveNotes(); render();
+  }
+  function render() {
+    noteCount.textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
+    document.getElementById('note-hint').textContent = notes.length ? '' : 'Nothing here yet';
+    notesList.innerHTML = '';
+    notes.forEach(function (note, index) {
+      const item = document.createElement('article'); item.className = 'index-card';
+      const badge = document.createElement('div'); badge.className = 'badge'; badge.textContent = note.locked ? 'LOCK' : 'NOTE';
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const title = document.createElement('div'); title.className = 'title'; title.textContent = note.title;
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = note.locked ? 'Locked note' : note.content;
+      meta.append(title, sub);
+      const actions = document.createElement('div'); actions.className = 'actions';
+      const view = document.createElement('button'); view.className = 'btn btn-outline btn-sm'; view.textContent = 'View';
+      view.addEventListener('click', function () {
+        sessionStorage.setItem('notes-selected-index', String(index));
+        window.location.href = '/note-view.html';
+      });
+      const modify = document.createElement('button'); modify.className = 'btn btn-outline btn-sm'; modify.textContent = 'Modify';
+      modify.addEventListener('click', function () {
+        sessionStorage.setItem('notes-selected-index', String(index));
+        window.location.href = '/edit-note.html';
+      });
+      const remove = document.createElement('button'); remove.className = 'btn btn-danger btn-sm'; remove.textContent = 'Delete';
+      remove.addEventListener('click', async function () {
+        const deletedNote = notes[index];
+        const result = await supabase.from('notes').update({ deleted_at: new Date().toISOString() }).eq('id', deletedNote.id).eq('user_id', user.id);
+        if (result.error) { showMessage(result.error.message, 'error'); return; }
+        notes.splice(index, 1); saveNotes(); render(); showMessage('Note moved to Recycle Bin.', 'success');
+      });
+      actions.append(view, modify, remove); item.append(badge, meta, actions); notesList.append(item);
+    });
+    if (!notes.length) notesList.innerHTML = '<div class="empty"><div class="icon">N</div>No notes yet. Add your first note.</div>';
+  }
+
+  document.getElementById('important').addEventListener('change', function (event) { document.getElementById('note-password-field').hidden = !event.target.checked; });
+  document.getElementById('note-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const locked = document.getElementById('important').checked; const password = document.getElementById('note-password').value;
+    if (locked && password.length < 4) { showMessage('Locked notes need a password of at least 4 characters.', 'error'); return; }
+    const result = await supabase.from('notes').insert({ user_id: user.id, title: document.getElementById('title').value, content: document.getElementById('content').value, is_locked: locked, note_password: password || null }).select().single();
+    if (result.error) { showMessage(result.error.message, 'error'); return; }
+    notes.unshift({ id: result.data.id, title: result.data.title, content: result.data.content, locked: result.data.is_locked, password: result.data.note_password, createdAt: result.data.created_at });
+    saveNotes(); event.target.reset(); document.getElementById('note-password-field').hidden = true; render(); showMessage('Note saved to Supabase.', 'success');
+  });
+  document.getElementById('logout').addEventListener('click', function () { window.location.href = '/login.html'; });
+  await loadNotes();
+})();
+</script>
+</body>
+</html>
